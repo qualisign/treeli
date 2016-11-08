@@ -1,0 +1,82 @@
+<html>
+  <head>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/p5.js/0.4.20/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.4.22/addons/p5.sound.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.4.23/addons/p5.dom.min.js"></script> 
+  </head>
+  <body>
+    <script>
+      var NOTE_FREQS = [16.35, 17.32, 18.35, 19.45, 20.60, 21.83, 23.12, 24.50, 25.96, 27.50, 29.14, 30.87];
+      var CANVAS_WIDTH = 1024;
+      var CANVAS_HEIGHT = 768;
+      var OUTER_RADIUS = 300;
+      var inner_radius = 285;
+      var notes = [];
+      var playing = false;
+      var level = 0;
+      var noteCount = 0;
+      var duration = 500;
+      var freq1;
+      var freq2;
+      var circlePressed;
+      var goButton;
+      
+      function setup() {
+        createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);  
+        osc = new p5.Oscillator();
+        osc.setType('sine');
+        goButton = createButton('go');
+        goButton.mousePressed(go);
+      }
+
+      function draw() {
+
+        outerCircle = ellipse(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, OUTER_RADIUS, OUTER_RADIUS);
+        innerCircle = ellipse(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, innerRadius, innerRadius);
+        circlePressed = innerCircle.mousePressed() || outerCircle.mousePressed();
+        
+      }
+      
+      function go()
+      {
+        while (innerCircle)
+        {
+	  setTimeout(function()
+          { 
+	    freq = NOTE_FREQS[floor(Math.random()) * NOTE_FREQS.length]
+
+	    osc.freq(freq);
+            playing = true;
+      	    osc.start();
+	    osc.amp(0.5, 0.05);		     
+            osc.stop(duration/1000);			      
+	    notes.append(freq);
+	    if (noteCount > 1)
+	    {
+              check(freq, notes[noteCount-2]);
+	    }
+	    }
+	   }, duration);
+        }
+      }
+
+
+      function check(freq1, freq2)
+      {
+        if (freq1 == freq2 && circlePressed)
+        {
+          points += level;
+          duration -+ 10;
+
+	} else if ((freq1 == freq2 && !circlePressed) || (freq1 != freq2 && (circlePressed)))
+        {
+	  innerRadius -= 15;
+
+	}
+
+
+      }
+
+    </script>
+  </body>
+  

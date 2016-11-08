@@ -1,0 +1,187 @@
+from django.db import models
+from django.contrib.auth.models import User
+import math
+
+phi = 0.6180339887
+length = 640
+trunk_length = 200
+branch_length = trunk_length * phi
+twig_length = branch_length * phi
+
+class UserProfile(models.Model):
+    # This line is required. Links UserProfile to a User model instance.
+    user = models.OneToOneField(User)
+    points = models.IntegerField(default=0)
+
+    # The additional attributes we wish to include.
+    website = models.URLField(blank=True)
+#   picture = models.ImageField(upload_to='profile_images', blank=True)
+
+    # Override the __unicode__() method to return out something meaningful!
+    def __unicode__(self):
+        return self.user.username    
+    
+class Drawing(models.Model):
+    text = models.CharField(max_length=100)
+    trunk = models.OneToOneField('Trunk', null=False)
+    
+    def get_data(self):
+        data = {}
+        if self.trunk.branch_set.all()[0]:
+            trunk = self.trunk
+            data["trunk_text_0"] = trunk.text
+            data["trunk_stage_0"] = trunk.stage
+            data["trunk_base_x_0"] = trunk.base_x
+            data["trunk_base_y_0"] = trunk.base_y
+            data["trunk_tip_x_0"] = trunk.tip_x
+            data["trunk_tip_y_0" ] = trunk.tip_y
+            for i in range(self.trunk.branch_set.all().count()):
+                branch = self.trunk.branch_set.all()[i]
+                data["branch_text_" + str(i)] = branch.text
+                data["branch_stage_" + str(i)] = branch.stage
+                data["branch_base_x_" + str(i)] = branch.base_x
+                data["branch_base_y_" + str(i)] = branch.base_y
+                data["branch_tip_x_" + str(i)] = branch.tip_x
+                data["branch_tip_y_" + str(i)] = branch.tip_y
+                if branch.twig_set:
+                    for j in range(branch.twig_set.all().count()):
+                        twig = branch.twig_set.all()[j]
+                        data["twig_text_" + str(j)] = twig.text
+                        data["twig_stage_" + str(j)] = twig.stage
+                        data["twig_base_x_" + str(j)] = twig.base_x
+                        data["twig_base_y_" + str(j)] = twig.base_y
+                        data["twig_tip_x_" + str(j)] = twig.tip_x
+                        data["twig_tip_y_" + str(j)] = twig.tip_y
+                        if twig.leaf_set:
+                            for k in range(twig.leaf_set.all().count()):
+                                leaf = twig.leaf_set.all()[k]
+                                data["leaf_text_" + str(k)] = leaf.text
+                                data["leaf_stage_" + str(k)] = leaf.stage
+                                data["leaf_center_x_" + str(k)] = leaf.center_x
+                                data["leaf_center_y_" + str(k)] = leaf.center_y
+                                data["leaf_height_" + str(k)] = leaf.height
+                                data["leaf_width_" + str(k)] = leaf.width
+                                data["leaf_rotate_" + str(k)] = leaf.rotate
+        return data
+                
+class Tree(models.Model):
+    name = models.CharField(max_length=100)
+    saved_by = models.ManyToManyField(User)
+    twigs_learned = models.IntegerField(default=0)
+    category = models.CharField(max_length=20, null=True)
+    trunk = models.OneToOneField('Trunk', null=False, default=None)
+
+    def rank_twigs(self):
+        branches = self.trunk.branch_set.all()
+        for branch in branches:
+            other_branches = branches.exclude(text=branch.text)
+            for twig in branch.twig_set.all():
+                twig.tree = self
+                for other_branch in other_branches:
+                    other_twigs = other_branch.twig_set.all()
+                    for other_twig in other_twigs:
+                        leaves = twig.leaf_set.all()
+                        other_leaves = other_twig.leaf_set.all()
+                        count = 0
+                        for leaf in leaves:
+                            if leaf.text in [i.text for i in other_leaves]:
+                                count += 1
+                        print ("count computed")    
+                        if count > twig.rank:
+                            twig.rank = count
+                            self.save()
+                            twig.save()
+        
+class Trunk(models.Model):
+    text = models.CharField(max_length=100)
+    language = models.CharField(max_length=20, null=True)
+    stage = models.CharField(max_length=8, default="blank")
+    created_by = models.ForeignKey(User, default=None, null=True)
+    base_x = models.IntegerField(default=length/2)
+    base_y = models.IntegerField(default=length)
+    tip_x = models.IntegerField(default=length/2)
+    tip_y = models.IntegerField(default=length-trunk_length)
+    
+class Branch(models.Model):
+    text = models.CharField(max_length=100)
+    trunk = models.ForeignKey(Trunk, null=True, default=None)
+    stage = models.CharField(max_length=8, default="blank")
+    base_x = models.IntegerField(default=length/2)
+    base_y = models.IntegerField(default=length-trunk_length)
+    tip_x = models.IntegerField(default=0)
+    tip_y = models.IntegerField(default=0)
+   
+    def get_tips(self):
+        if self.trunk:
+            branches_x_tips = [i.tip_x for i in self.trunk.branch_set.all()]
+            branches_y_tips = [i.tip_y for i in self.trunk.branch_set.all()]
+            tip_x = length/2 + (branch_length*(math.cos(21.6 * len(branches_x_tips))))
+            tip_y = length - trunk_length - (branch_length*(math.sin(21.6 * len(branches_y_tips))))
+            self.tip_x = tip_x
+            self.tip_y = tip_y
+            self.save()
+        else:
+            tip_x = length/2
+            tip_y = length - trunk_length - branch_length
+            self.tip_x = tip_x
+            self.tip_y = tip_y
+            self.save()
+            
+class Twig(models.Model):
+    text = models.CharField(max_length=100)
+    branch = models.ForeignKey(Branch, null=True)
+    misses = models.ManyToManyField('Leaf')
+    rank = models.IntegerField(default=0)
+    stage = models.CharField(max_length=8, default="blank")
+    base_x = models.IntegerField(default=0)
+    base_y = models.IntegerField(default=0)
+    tip_x = models.IntegerField(default=0)
+    tip_y = models.IntegerField(default=0)
+    tree = models.ForeignKey(Tree, null=True)
+
+    def get_tips(self):
+        if self.branch:
+            twigs_x_tips = [i.tip_x for i in self.branch.twig_set.all()]
+            twigs_y_tips = [i.tip_y for i in self.branch.twig_set.all()]
+            self.base_x = self.branch.tip_x
+            self.base_y = self.branch.tip_y
+            tip_x = self.base_x + (twig_length*(math.cos(21.6 * len(twigs_x_tips))))
+            tip_y = self.base_y - (twig_length*(math.cos(21.6 * len(twigs_y_tips))))
+            self.tip_x = tip_x
+            self.tip_y = tip_y
+            self.save()
+                
+class Leaf(models.Model):
+    text = models.CharField(max_length=100)
+    twigs = models.ManyToManyField(Twig)
+    stage = models.CharField(max_length=8, default="blank")
+    center_x = models.IntegerField(default=0)
+    center_y = models.IntegerField(default=0)
+    height = models.IntegerField(default=2)
+    width = models.IntegerField(default=2)
+    rotate = models.IntegerField(default=0)
+    reminders = models.IntegerField(default=1)
+    learned = models.BooleanField(default=False)
+
+    def get_tips(self, twig_text):
+        twig = Twig.objects.get(text=twig_text)
+        leaves_x_centers = [i.center_x for i in twig.leaf_set.all()]
+        leaves_y_centers = [i.center_y for i in twig.leaf_set.all()]
+        self.center_x = len(leaves_x_centers)
+        self.center_y = len(leaves_y_centers)
+        self.save()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <!-- Is anyone getting tired of repeatedly entering the header over and over?? -->
+        <title>login</title>
+    </head>
+
+    <body>
+        <h1>log in to treeli</h1>
+
+        <form id="login_form" method="post" action="/login/">
+            {% csrf_token %}
+            username: <input type="text" name="username" value="" size="50" />
+            <br />
+            password: <input type="password" name="password" value="" size="50" />
+            <br />
+
+            <input type="submit" value="submit" />
+        </form>
+
+    </body>
+</html>

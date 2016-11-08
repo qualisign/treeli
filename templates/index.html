@@ -1,0 +1,250 @@
+
+<html>
+{% load staticfiles %}
+  <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/p5.js/0.4.20/p5.js"></script>
+  </head>
+<body>
+  <div id="message" style="visibility: hidden;"></div>
+  <div id="tree"></div>
+  <a href="/register/">register</a>
+<form method="POST">
+  {% csrf_token %}
+  <input type="text" id="txt" />
+  <input type="submit" id="grow" value="grow" style="color: grey;"/>
+  <input type="submit" id="learn" value="learn" style="color: grey;"/>
+  <input type="submit" id="enter" value="enter" style="visibility: hidden;"/>
+  <input type="submit" id="done" value="done" style="visibility: hidden;"/>
+  <input type="submit" id="check" value="check" style="visibility: hidden;" />
+  <input type="submit" id="stumped" value="stumped" style="visibility: hidden;" />
+</form>
+
+<script>
+  
+  var GROW_PATTERN = /.+\(.+\)/;
+  var REQUIREMENTS = "valid entries must be of the form ";
+  var GROW = "X(Y)".italics();
+  var GROW_REQUIREMENTS = REQUIREMENTS + GROW;
+  var LEARN_REQUIREMENTS = "grow a tree with at least two branches to begin learning.";
+  
+  var filtered_keys = function(obj, filter) {
+    var key, keys = [];
+    for (key in obj) {
+      if (obj.hasOwnProperty(key) && key.test(filter)) {
+        keys.push(key);
+      }
+    }
+  return keys;
+  }
+  
+  // define p5 functions
+
+function setup(){
+  createCanvas(640, 640);
+
+}			      
+			      
+function draw(data){
+  var json = data;
+  for (var i = 0; i < Object.keys(json).length; i++){
+
+    var trunkCatcher = "trunk_base_x_" + i;
+    var branchCatcher = "branch_base_x_" + i;
+    var twigCatcher = "twig_base_x_" + i;
+		      
+    if (json[trunkCatcher]){
+      strokeWeight(5);
+      line(json[trunkCatcher], json["trunk_base_y_" + i], json["trunk_tip_x_" + i], json["trunk_tip_y_" + i]);
+    }
+    if (json[branchCatcher]){
+      strokeWeight(3);
+      line(json[branchCatcher], json["branch_base_y_" + i], json["branch_tip_x_" + i], json["branch_tip_y_" + i]);
+    }
+
+    if (json[twigCatcher]){
+      strokeWeight(2);
+      line(json[twigCatcher], json["twig_base_y_" + i], json["twig_tip_x_" + i], json["twig_tip_y_" + i]);
+
+
+    }  
+    if (json[leafCatcher]){
+      strokeWeight(1);
+      ellipse()		      
+    }
+   }
+		    
+}
+
+	
+function getCookie(name) {
+          var cookieValue = null;
+          if (document.cookie && document.cookie != '') {
+                var cookies = document.cookie.split(';');
+          for (var i = 0; i < cookies.length; i++) {
+               var cookie = jQuery.trim(cookies[i]);
+          // Does this cookie string begin with the name we want?
+          if (cookie.substring(0, name.length + 1) == (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+             }
+          }
+      }
+ return cookieValue;
+}
+
+  $("#grow").hover(
+    function() {
+      $("#message").text(GROW_REQUIREMENTS);
+      $("#message").css('visibility', $("#txt").val().match(GROW_PATTERN) ? 'hidden' : 'visible');
+      $.prototype.css.bind($("#message"), 'visibility', 'hidden');
+  });
+
+  $("#learn").hover(			      
+    function() {
+      $("#message").text(LEARN_REQUIREMENTS);
+      $("#message").css('visibility', ($("#learn").css('color') === "black") ? 'hidden' : 'visible');
+      $.prototype.css.bind($("#message"), 'visibility', 'hidden');
+  });
+			      
+  $("#grow").click(
+    function(e) {
+      console.log("attempting ajax...");
+      e.preventDefault();			      
+      var csrftoken = getCookie('csrftoken');
+      var open_parens = ($("#txt").val()).indexOf("(");
+      var close_parens = ($("#txt").val()).indexOf(")");
+      var child = $("#txt").val().slice(0, open_parens);
+      var parent = $("#txt").val().slice(open_parens + 1, close_parens);
+      $("#txt").val('');
+			      
+      $.ajax({
+	url : window.location.href,
+        type : "POST",
+        data : { csrfmiddlewaretoken : csrftoken,
+                 child : child,
+                 parent : parent,
+	         mode : "grow"
+	       },
+        success : function(json) {
+                    if (json['already']){
+		      $("#message").text(json['child'] + "(" + json['parent'] + ") already grown.  Please enter something else!");
+		    } else {
+		    setup();
+		    draw(json);
+		    console.log("draw called successfully, json type is: " + typeof json);	      
+
+		    $("#learn").css('color', json['tree?'] ? 'black' : 'grey');
+		    if (json['tree?']){
+		      $("#tree").text(json['tree?']);
+		    }
+		    }
+	           },
+        error : function(xhr, errmsg, err) {
+              console.log(xhr.status + ": " + xhr.responseText);
+                                         }
+			      
+         });
+});
+
+			      
+  $("#learn").click(
+    function(e) {
+      e.preventDefault();
+      console.log("attempting to execute the prompt...");
+      var csrftoken = getCookie('csrftoken');
+      var tree = document.getElementById("tree").innerHTML;
+      $.ajax({
+        url : window.location.href,
+        type : "POST",
+        data : { csrfmiddlewaretoken : csrftoken,
+     	         mode : "prompt",
+		 trunkName : tree,
+       	       },			      
+        success : function(json) {
+	            console.log("attempting to prompt with json");
+	            $("#message").text("which " + json['twig'] + "(s) do you remember?");
+ 	            awaitEntries();                  
+
+			      },
+        error : function(xhr, errmsg, err) {
+              console.log(xhr.status + ": " + xhr.responseText);
+			               },
+      	 });			      
+
+});			      
+
+  $("#txt").on('input', function() {
+    $("#grow").css('color', $("#txt").val().match(GROW_PATTERN) ? 'black' : 'grey');
+  });
+
+function awaitEntries(){
+  
+  $("#done").css('visibility', 'visible');
+  $("#enter").css('visibility', 'visible')
+			      }
+
+$("#enter").click(function(e) {
+  e.preventDefault();
+  var csrftoken = getCookie('csrftoken');			      
+  var tries = $("#txt").val();
+  var tree = document.getElementById("tree").innerHTML;
+  $.ajax({
+    url : http://127.0.0.1:8000/treeli/learn/,
+    type : "POST",
+    data : { csrfmiddlewaretoken : csrftoken,
+             mode : "remind",
+             tries : tries,			      
+	     trunkName : tree,		      
+			      },
+    success : function(json){
+	        if (json['twig']){
+	          $("#message").text("which " + json['twig'] + " " + tree + "(s) do you remember?");
+                  
+			      
+	        } else if (json['miss']){
+		  var nextTwigs = json['next_twigs'];
+                  $("#message").text("can you remember a " + tree + " that is " + json['miss'] + " AND " + json['next_twigs'] + "?");
+	          remind(json)
+			      }
+	        },
+
+    error : function(xhr, errmsg, err) {
+              console.log(xhr.status + ": " + xhr.responseText);
+			               },
+
+			      })			      
+
+    });
+			      
+
+function remind(json){
+
+  $("#enter").submit(function(e) {
+  e.preventDefault();
+  var csrftoken = getCookie('csrftoken');			      
+  var toCheck = $("#txt").val();  
+  var treeName = $("#tree").val();
+  var nextTwigs = json['next_twigs']			      
+  $.ajax({
+    url : window.location.href,
+    type : "POST",
+    data : { csrfmiddlewaretoken : csrftoken,
+             mode : "check",
+             toCheck : toCheck,			      
+             nextTwigs: nextTwigs,
+			      },
+    success : function(){
+       
+
+			      },			      
+    error : function(xhr, errmsg, err) {
+              console.log(xhr.status + ": " + xhr.responseText);
+			               },
+			      })
+			      });
+			      }
+			      		      
+</script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse
+from models import User, Leaf, Twig, Branch, Trunk, Tree
+
+def index(request):
+    if request.method != 'POST':
+        print("request wasn't a post")
+        return render(request, 'index.html')
+    else:
+        if request.is_ajax():
+            if request.POST.get('userName'):
+                user_name=request.POST.get('userName')
+                user=User.objects.get(user_name=user_name)
+            else:
+                user=None
+            print("request is ajax")
+            if request.POST.get("mode") == "grow":
+                parent = request.POST.get('parent')
+                child = request.POST.get('child')
+                # case 1: parent already trunk -- create branch from child
+                print("child is " + child)
+                try:
+                    trunk = Trunk.objects.get(text=parent)
+                    if trunk:
+                        branch = Branch(text=child, trunk=trunk)
+                        branch.tip_x = branch.get_tips[0]
+                        branch.tip_y = branch.get_tips[1]
+                        branch.save()
+                        data = {"branch_text" : branch.text,
+                                "branch_drawing" : branch.drawing,
+                                "branch_base_x" : branch.base_x,
+                                "branch_base_y" : branch.base_y,
+                                "branch_tip_x" : branch.tip_x,
+                                "branch_tip_y" : branch.tip_y,
+                            }
+                        if trunk.branch_set.count() > 1:
+                            data["tree?"] = trunk.text
+                        branch.drawing = "filled"
+                        branch.save()
+                        return JsonResponse(data)
+                except Trunk.DoesNotExist:
+                    # case 2: child already trunk and degree 
+
+
+
+
+
+
+
+
+
+                        
+                    # case 2: parent already branch -- create twig from child
+                    print("trying case 2")
+                    try:
+                        branch = Branch.objects.get(text=parent)
+                        if branch:
+                            twig = Twig(text=child, branch=branch)                        
+                            twig.save()
+                            data = {"twig_text" : branch.text,
+                                    "twig_drawing" : branch.drawing,
+                                    "twig_base_x" : branch.base_x,
+                                    "twig_base_y" : branch.base_y,
+                                    "twig_tip_x" : branch.tip_x,
+                                    "twig_tip_y" : branch.tip_y,
+                                }
+
+                            try:
+                                branch_trunk = branch.trunk
+                                if branch_trunk.branch_set.count() > 1:
+                                    data["tree?"] = branch.trunk.text
+                            except:
+                                pass
+                            finally:
+                                twig.drawing = "filled"
+                                twig.save()
+                                return JsonResponse(data)
+                                
+                    except Branch.DoesNotExist:
+                        # case 3: parent already twig -- create leaf from child
+                        print("trying case 3")
+                        try:
+                            twig = Twig.objects.get(text=parent)
+                            if twig:
+                                leaf = Leaf(text=child)
+                                leaf.save()
+                                leaf.twigs.add(twig)
+                                leaf.save()
+                                data = {"leaf_text" : leaf.text,
+                                        "leaf_drawing" : leaf.drawing,
+                                        "leaf_center_x" : leaf.center_x,
+                                        "leaf_center_y" : leaf.center_y,
+                                        "leaf_height" : leaf.height,
+                                        "leaf_width" : leaf.width,
+                                        "leaf_rotate" : leaf.rotate,
+                                }
+                                try:
+                                    twig_trunk = twig.branch.trunk
+                                    if twig_trunk.branch_set.count() > 1:
+                                        data["tree?"] = twig.branch.trunk.text
+                                except:
+                                    pass
+                                finally:
+                                    leaf.drawing = "filled"
+                                    leaf.save()
+                                    return JsonResponse(data)
+                        except Twig.DoesNotExist:
+                            print("trying case 4")
+                            # case 4: child already branch -- create trunk from parent
+                            try:
+                                branch = Branch.objects.get(text=child)
+                                if branch:
+                                    trunk = Trunk(text=parent)
+                                    trunk.save()
+                                    branch.trunk = trunk
+                                    branch.save()
+                                    data = {"trunk_text" : trunk.text,
+                                            "trunk_drawing" : trunk.drawing,
+                                            "trunk_base_x" : trunk.base_x,
+                                            "trunk_base_y" : trunk.base_y,
+                                            "trunk_tip_x" : trunk.tip_x,
+                                            "trunk_tip_y" : trunk.tip_y,
+                                    }        
+                                    if trunk.branch_set.count() > 1:
+                                        data["tree?"] = trunk.text
+                                    trunk.drawing = "filled"
+                                    trunk.save()
+                                    return JsonResponse(data)
+                            except Branch.DoesNotExist:
+                                # case 5: child already twig -- create branch from parent
+                                print("trying case 5")
+                                try:
+                                    twig = Twig.objects.get(text=child)
+                                    if twig: 
+                                        branch = Branch(text=parent)
+                                        branch.save()
+                                        twig.branch = branch
+                                        twig.save()
+                                        data = {"branch_text" : branch.text,
+                                                "branch_drawing" : branch.drawing,
+                                                "branch_base_x" : branch.base_x,
+                                                "branch_base_y" : branch.base_y,
+                                                "branch_tip_x" : branch.tip_x,
+                                                "branch_tip_y" : branch.tip_y,
+                                        }
+                                        try:
+                                            branch_trunk = branch.trunk
+                                            if branch_trunk.branch_set.count() > 1:
+                                                data["tree?"] = branch.trunk.text
+                                        except:
+                                            pass
+                                        finally:
+                                            branch.drawing = "filled"
+                                            branch.save()
+                                            return JsonResponse(data)
+                                except Twig.DoesNotExist:
+                                # case 6: child already leaf -- create twig from parent
+                                    print("trying case 6")
+                                    try:
+                                        leaf = Leaf.objects.get(text=child)
+                                        if leaf:
+                                            twig = Twig(text=parent)
+                                            twig.save()
+                                            leaf.twigs.add(twig)
+                                            leaf.save()
+                                            data = {"twig_text" : twig.text,
+                                                    "twig_drawing" : twig.drawing,
+                                                    "twig_base_x" : twig.base_x,
+                                                    "twig_base_y" : twig.base_y,
+                                                    "twig_tip_x" : twig.tip_x,
+                                                    "twig_tip_y" : twig.tip_y,
+                                            }
+                                            twig.drawing = "filled"
+                                            twig.save()
+                                            return JsonResponse(data)
+                                    except Leaf.DoesNotExist:
+                                        # case 7: neither child nor parent saved to tree -- 
+                                        # create leaf from child and twig from parent
+                                        print("trying case 7")
+                                        trunk = Trunk.objects.create(text=parent)
+                                        trunk.save()
+                                        Branch = Branch.objects.create(text=child)
+                                        branch.save()
+                                        branch.tip_x = branch.get_tips[0]
+                                        branch.tip_y = branch.get_tips[1]
+                                        branch.trunk = trunk
+                                        branch.save()
+                                        
+                                        data = {"trunk_text" : twig.text,
+                                                "trunk_drawing" : twig.drawing,
+                                                "trunk_base_x" : 320,
+                                                "trunk_base_y" : 640,
+                                                "trunk_tip_x" : 320,
+                                                "trunk_tip_y" : 440,
+                                                "branch_text" : leaf.text,
+                                                "branch_drawing" : leaf.drawing,
+                                                "branch_base_x" : 320
+                                                "branch_base_y" : 440
+                                                "branch_tip_x" : branch_tip_x
+                                                "branch_tip_y" : branch_tip_y
+                                        }
+                                        twig.drawing = "filled"
+                                        twig.save()
+                                        leaf.drawing = "filled"
+                                        leaf.save()
+                                        return JsonResponse(data)
+
+            elif request.POST.get("mode") == "prompt":
+                try:
+                    print("trying trunk name...")
+                    trunk_name = request.POST.get("trunkName")
+                    print("trunk name is " + trunk_name)
+                    tree = Tree.objects.get(name=trunk_name)
+                except (Tree.DoesNotExist):
+                    trunk_name = request.POST.get("trunkName")
+                    trunk = Trunk.objects.get(text=trunk_name)   
+                    print("trunk found")
+                    tree = Tree(name=trunk_name, trunk=trunk)
+                    tree.save()
+                    sort_twigs(tree)
+                    tree.save()
+                finally:
+                    current_twig = tree.sorted_twigs[tree.twigs_learned]
+                    print("current twig is " + current_twig.text)
+                    data = { "twig" : current_twig.text }
+                    return JsonResponse(data)
+                    
+            elif request.POST.get("mode") == "remind":
+                
+                current_twig = tree.sorted_twigs[tree.twigs_learned]
+                tries = request.POST.get("tries").strip(',')
+                for leaf in current_twig.leaf_set:
+                    if leaf.text in tries:
+                        leaf.learned = True
+                        leaf.save()
+                        if current_twig.leaf_set.count() == current_twig.leaf_set.filter(learned==True).count():
+                            tree.twigs_learned += 1
+                            tree.save()
+                            current_twig = tree.sort_twigs[tree.twigs_learned]
+                            data = {"twig" : current_twig.text}
+                            return JsonResponse(data)
+                        else:
+                            for miss in current_twig.leaf_set.all():
+                                if miss.learned == False:
+                                    current_twig.misses.add(miss)
+                                    current_twig.save()
+                            missed_leaf = current_twig.misses[0]
+                            next_twigs = [i.text for i in missed_leaf.twigs[0:missed_leaf.reminders]]
+                            data = {"miss" : missed_leaf.text, "next_twigs" : next_twigs}
+                            missed_leaf.reminders += 1
+                            misses_leaf.save()
+                            return JsonResponse(data)
+
+            elif request.POST.get("mode") == "check":
+                to_check = request.POST.get("toCheck")
+                try:
+                    matching_leaf = current_twig.leaf_set.get(text=to_check)
+                    next_leaf = current_twig.misses[indexofmissedleaf+1]
+                    other_twigs = request.POST.get(nextTwigs)
+                    next_leaf_next_twigs = [i.text for i in next_leaf.twigs[0:missed_leaf.reminders]]
+                    if other_twigs in [twig.text for i in matching_leaf.twigs]:
+                        # user successfully remembered missed leaf she was reminded of. go on
+                        # to next leaf...
+                        matching_leaf.learned = True
+                        matching_leaf.save()
+                        current_twig.misses.remove(matching_leaf)
+                        data = { "miss" : next_leaf.text, "next_twigs" : next_leaf_next_twigs }
+                        return JsonResponse(data)
+                except matching_leaf.DoesNotExist:
+                    # user failed to remember missed leaf she was reminded of.
+                    # give another reminder, unless she has exhausted them all...
+                    missed_leaf = current_twig.misses[0]
+                    next_twigs = [i.text for i in missed_leaf.twigs[0:missed_leaf.reminders]]
+                    data = { "miss" : current_twig, "next_twigs" : [i.text] }
+                    return JsonResponse(data)    
+                        
+        else:        
+            print("request wasn't ajax")
+            return render(request, 'index.html')
+   
+def profile(request, username):
+    return HttpResponse(username)
+    
+def pfive(request):
+    return render(request, 'pfive.html')
+
+def sort_twigs(tree):
+    print("attempting to sort twigs for tree " + tree.name)
+    branches = tree.trunk.branch_set
+    for branch in branches:
+        other_branches = branch.trunk.branch_set.exclude(text=branch.text)
+        for twig in branch.twig_set:
+            other_twigs = [i.twig_set for branch in other_branches]
+            for other_twig in other_twigs:
+                leaves = set(twig.leaf_set)
+                other_leaves = set(other_twig.leaf_set)
+                overlaps = leaves & other_leaves
+    #            print("overlaps of twigs %s and %s are %d").format(twig.name, other_twigs.name, overlap.len()))
+                if overlaps.len() > twig.rank:
+                    twig.rank = overlaps.len()
+                    twig.save()
+                    
+                    
+
+
+
+
+
+
+        
